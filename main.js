@@ -4,6 +4,20 @@ const passport = require('passport');
 const LocalStrategy = require('passport-local').Strategy;
 const fetch = require('node-fetch')
 
+const AWS = require('aws-sdk');
+const fs = require('fs')
+var multer = require('multer');
+var multipart = multer({dest: 'uploads/'});
+const config = require('./config.json');
+AWS.config.credentials = new AWS.SharedIniFileCredentials('day25todo');
+const endpoint = new AWS.Endpoint('fra1.digitaloceanspaces.com');
+const s3 = new AWS.S3({
+    endpoint: endpoint,
+    accessKeyId: config.accessKeyId || process.env.ACCESS_KEY,
+    secretAccessKey: config.secretAccessKey
+    || process.env.SECRET_ACCESS_KEY
+});
+
 const morgan = require('morgan')
 const express = require('express');
 const mysql = require('mysql2/promise')
@@ -13,6 +27,9 @@ const jwt = require('jsonwebtoken')
 global.env = secureEnv({secret:'mySecretPassword'})
 const TOKEN_SECRET = global.env.TOKEN_SECRET || 'secret'
 const app = express();
+
+const SQL_SAVE_WINE = 'insert into favouritewines (wineID, wineName, userName, digitalOceanKey ) values (?,?,?, ?);'
+const SQL_SELECT_ALL_FROM_FAVOURITES_WHERE_USERNAME = 'select * from favouritewines where userName = ?;'
 
 app.use(morgan('combined'))
 app.use (express.json())
@@ -31,7 +48,7 @@ passport.use(
         async (req, username, password, done) => {
             // perform authentication
             const conn = await pool.getConnection()
-            const [ result, _ ] = await conn.query( 'select user_id from user where user_id like ? and password like sha1(?)', [username, password],)
+            const [ result, _ ] = await conn.query( 'select userName from users where userName = ? and password = sha1(?)', [username, password],)
 
             console.info('result', result.length)
             if (result.length) {
@@ -62,7 +79,7 @@ passport.use(
 const pool = mysql.createPool({
 	host: process.env.DB_HOST || 'localhost',
 	port: parseInt(process.env.DB_PORT) || 3306,
-	database: 'paf2020',
+	database: 'lol',
 	user: global.env.DB_USER || process.env.DB_USER,
 	password: global.env.DB_PASSWORD || process.env.DB_PASSWORD,
 	connectionLimit: 4
@@ -137,6 +154,7 @@ app.get('/protected/secret',
     (req, resp, next) => {
         // check if the request has 'authorization' header
         const auth = req.get('Authorization')
+        console.info('QQQQ', auth)
         if (null == auth){
             resp.status(403)
             resp.json({message: 'Missing authorization access'})
@@ -168,7 +186,7 @@ app.get('/protected/secret',
 
     (req, resp) => {
         resp.status(200)
-        resp.json({message: 'Token valid'})
+        resp.json({message: 'Token valid', status: 200})
     }
 )
 
@@ -223,4 +241,83 @@ app.get('/getWineDetails/:wineID', async (req, resp) => {
         console.info(e)
     }
 
+})
+
+// upload file to S3
+app.post('/saveWine', multipart.single('image-file'),
+    async (req, resp) => {
+
+        const wineID = req.query.wineID;
+        const userName = req.query.userName;
+        const digitalOceanKey = req.file.filename
+        const wineName = req.query.wineName
+        
+        const conn = await pool.getConnection()
+        try {
+    
+            await conn.beginTransaction() // to prevent only one DB from being updated
+    
+            // post to digital ocean
+            fs.readFile(req.file.path, async (err, imgFile) => {
+            
+                const params = {
+                    Bucket: 'day25todo',
+                    Key: req.file.filename,
+                    Body: imgFile,
+                    ACL: 'public-read',
+                    ContentType: req.file.mimetype,
+                    ContentLength: req.file.size,
+                    Metadata: {
+                        originalName: req.file.originalname,
+                        author: 'alvin',
+                        update: 'image',
+                    }
+                }
+                // post to digital ocean continued
+                s3.putObject(params, (error, result) => {
+    
+                    // return resp.status(200)
+                    // .type('application/json')
+                    // .json({ 'key': req.file.filename });
+                })
+            })
+
+            // post to SQL
+            console.info('DO KEEYYYYY', req.file.filename)
+            await conn.query(
+                SQL_SAVE_WINE, [wineID, wineName, userName, digitalOceanKey],
+            )
+
+                
+            await conn.commit()
+    
+            resp.status(200)
+            resp.json()
+    
+        } catch(e) {
+            conn.rollback()
+            resp.status(500).send(e)
+            resp.end()
+        } finally {
+            conn.release()
+        }
+
+    }    
+);
+
+app.get('/favourites/:userName', async (req, resp) => {
+
+	const userName = req.params.userName
+	const conn = await pool.getConnection()
+	try {
+		const [ result, _ ] = await conn.query(SQL_SELECT_ALL_FROM_FAVOURITES_WHERE_USERNAME, [userName])
+		resp.status(200)
+		resp.type('application/json').send(result)
+	} catch(e) {
+		console.error('ERROR: ', e)
+		resp.status(500)
+		resp.end()
+	} finally {
+		conn.release()
+	}
 })
