@@ -2,6 +2,7 @@
 const passport = require('passport');
 //passport strategy
 const LocalStrategy = require('passport-local').Strategy;
+const fetch = require('node-fetch')
 
 const morgan = require('morgan')
 const express = require('express');
@@ -114,7 +115,7 @@ app.post('/login',
         const token = jwt.sign(
             {
                 sub: req.user.username,
-                iss: 'myapp',
+                iss: 'LOL',
                 iat: currTime,
                 exp: currTime + (60 * 60), // token expiring in x seconds
                 data: {
@@ -130,3 +131,96 @@ app.post('/login',
         resp.json({message: 'login on this date', token})
     }
 )
+
+// adhoc auth check
+app.get('/protected/secret',
+    (req, resp, next) => {
+        // check if the request has 'authorization' header
+        const auth = req.get('Authorization')
+        if (null == auth){
+            resp.status(403)
+            resp.json({message: 'Missing authorization access'})
+            return
+        }
+
+        // check for bearer type auth
+        const terms = auth.split(' ')
+        if (terms.length != 2 || terms[0] != 'Bearer'){
+            resp.status(403)
+            resp.json({message: 'Incorrect authorization access'})
+            return
+        }
+        
+        const token = terms[1]
+        
+        token.exp
+        try{
+            const verified = jwt.verify(token, TOKEN_SECRET)
+            req.token = verified
+            next()
+        } 
+        catch(e){
+            resp.status(403)
+            resp.json({message: 'Incorrect token', error: e})
+            return
+        }
+    },
+
+    (req, resp) => {
+        resp.status(200)
+        resp.json({message: 'Token valid'})
+    }
+)
+
+app.get('/searchResults/', async (req, resp) => {
+
+
+    const searchText = req.query['wineName']
+    console.info(searchText)
+    const skip = req.query['offset']
+    const limit = req.query['limit']
+    try{
+        const result = await fetch(`https://quiniwine.com/api/pub/wineKeywordSearch/${searchText}/${skip}/${limit}`, {
+            headers: {
+                'Authorization': 'Bearer ' + global.env.QUINI_API_KEY
+            }
+        }
+        ) 
+
+        // console.info(result)
+        const quiniapiresult =  await result.json() 
+    
+        resp.status(200)
+        resp.type('application/json')
+        resp.json(quiniapiresult)
+
+    }
+    catch(e){
+        console.info(e)
+    }
+
+})
+
+app.get('/getWineDetails/:wineID', async (req, resp) => {
+
+    const wineID = req.params['wineID']
+    try{
+        const result = await fetch(`https://quiniwine.com/api/pub/wineSummary.json?wine_id=${wineID}`, {
+            headers: {
+                'Accept': 'application/json',
+                'Authorization': 'Bearer ' + global.env.QUINI_API_KEY
+            }
+        }
+        ) 
+        const wineDetailsResult = await result.json()
+    
+        resp.status(200)
+        resp.type('application/json')
+        resp.json(wineDetailsResult)
+
+    }
+    catch(e){
+        console.info(e)
+    }
+
+})
