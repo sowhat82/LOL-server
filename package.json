@@ -4,14 +4,20 @@
   "description": "",
   "main": "main.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node main.js"
   },
   "author": "",
   "license": "ISC",
   "dependencies": {
     "aws-sdk": "^2.824.0",
     "body-parser": "^1.19.0",
+    "connect-busboy": "0.0.2",
     "express": "^4.17.1",
+    "express-fileupload": "^1.2.0",
+    "formidable": "^1.2.2",
+    "fs-extra": "^9.0.1",
+    "helpers": "0.0.6",
     "ibm-watson": "^6.0.2",
     "image-type": "^4.1.0",
     "jsonwebtoken": "^8.5.1",
@@ -22,6 +28,11 @@
     "node-fetch": "^2.6.1",
     "passport": "^0.4.1",
     "passport-local": "^1.0.0",
+    "path": "^0.12.7",
     "secure-env": "^1.2.0"
-  }
+  },
+  "engines":{
+    "node": "15.x"
+    }
+    
 }

@@ -9,7 +9,7 @@ const fs = require('fs')
 var multer = require('multer');
 var multipart = multer({dest: 'uploads/'});
 const config = require('./config.json');
-AWS.config.credentials = new AWS.SharedIniFileCredentials('day25todo');
+AWS.config.credentials = new AWS.SharedIniFileCredentials('lol-bucket');
 const endpoint = new AWS.Endpoint('ams3.digitaloceanspaces.com');
 const s3 = new AWS.S3({
     endpoint: endpoint,
@@ -155,23 +155,6 @@ app.post('/login',
             TOKEN_SECRET
         )
 
-        // TESTING IBM
-        const classifyParams = {
-            imagesFile: fs.createReadStream('./images/winelabel.jpg'),
-            owners: ['me'],
-            threshold: 0.5,
-            classifierIds: ['food'],
-        };
-          
-          visualRecognition.classify(classifyParams)
-            .then(response => {
-              const classifiedImages = response.result;
-              console.log(JSON.stringify(classifiedImages, null, 2));
-            })
-            .catch(err => {
-              console.log('error:', err);
-            });
-
         resp.status(200)
         resp.type('application/json')
         resp.json({message: 'login on this date', token})
@@ -274,10 +257,9 @@ app.get('/getWineDetails/:wineID', async (req, resp) => {
 
 })
 
-// upload file to S3
 app.post('/saveWine', multipart.single('image-file'),
     async (req, resp) => {
-
+        
         const wineID = req.query.wineID;
         const userName = req.query.userName;
         const wineName = req.query.wineName
@@ -287,7 +269,7 @@ app.post('/saveWine', multipart.single('image-file'),
         
         const conn = await pool.getConnection()
         try {
-    
+
             await conn.beginTransaction() // to prevent only one DB from being updated
     
             // post to digital ocean
@@ -394,6 +376,70 @@ app.get('/countryCount/:userName', async (req, resp) => {
 	}
 })
 
+app.post('/uploadPictureRecognition', multipart.single('image-file'),
+    async (req, resp) => {
+        try {
+            // post to digital ocean
+            if (req.file != null){
+
+                await fs.readFile(req.file.path, async (err, imgFile) => {         
+                    const params = {
+                        Bucket: 'picturerecognition',
+                        Key: req.file.filename,
+                        Body: imgFile,
+                        ACL: 'public-read',
+                        ContentType: req.file.mimetype,
+                        ContentLength: req.file.size,
+                        Metadata: {
+                            originalName: req.file.originalname,
+                            author: 'alvin',
+                            update: 'image',
+                        }
+                    }
+                    // post to digital ocean continued
+                    await s3.putObject(params, (error, result) => {
+        
+                        // return resp.status(200)
+                        // .type('application/json')    
+                        // .json({ 'key': req.file.filename });
+                    })
+
+                    resp.status(200)
+                    resp.json(req.file.filename)
+                })
+            }
+        } 
+        catch(e) {
+            resp.status(500).send(e)
+            resp.end()
+        } 
+    }    
+);
+
+app.get('/pictureRecognition/:digitalOceanKey', async (req, resp) => {
+
+    const digitalOceanKey = req.params['digitalOceanKey']
+    // IBM watson pic recognition
+    const classifyParams = {
+        url: 'https://picturerecognition.ams3.digitaloceanspaces.com/'+digitalOceanKey,
+        owners: ['me'],
+        threshold: 0.6,
+        classifierIds: ['food'],
+    };
+    
+    visualRecognition.classify(classifyParams)
+    .then((response) => {
+        const classifiedImages = response.result;
+        console.log(JSON.stringify(classifiedImages, null, 2));
+        resp.json(response)
+    })
+    .catch(err => {
+        console.log('error:', err);
+    });   
+})
+
 app.use(
     express.static(__dirname + '/static')
 )
+
+app.use(express.static ( __dirname + '/browser'))
