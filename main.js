@@ -10,7 +10,7 @@ var multer = require('multer');
 var multipart = multer({dest: 'uploads/'});
 const config = require('./config.json');
 AWS.config.credentials = new AWS.SharedIniFileCredentials('day25todo');
-const endpoint = new AWS.Endpoint('fra1.digitaloceanspaces.com');
+const endpoint = new AWS.Endpoint('ams3.digitaloceanspaces.com');
 const s3 = new AWS.S3({
     endpoint: endpoint,
     accessKeyId: config.accessKeyId || process.env.ACCESS_KEY,
@@ -28,8 +28,20 @@ global.env = secureEnv({secret:'mySecretPassword'})
 const TOKEN_SECRET = global.env.TOKEN_SECRET || 'secret'
 const app = express();
 
-const SQL_SAVE_WINE = 'insert into favouritewines (wineID, wineName, userName, digitalOceanKey ) values (?,?,?, ?);'
+const SQL_COUNT_DISTINCT_COUNTRIES = 'SELECT country, count(*) FROM favouritewines WHERE username = ? GROUP BY country order by count(*) desc;'
+const SQL_SAVE_WINE = 'insert into favouritewines (wineID, wineName, country, userName, digitalOceanKey ) values (?,?,?,?, ?);'
 const SQL_SELECT_ALL_FROM_FAVOURITES_WHERE_USERNAME = 'select * from favouritewines where userName = ?;'
+
+const VisualRecognitionV3 = require('ibm-watson/visual-recognition/v3');
+const { IamAuthenticator } = require('ibm-watson/auth');
+
+const visualRecognition = new VisualRecognitionV3({
+    version: '2018-03-19',
+    authenticator: new IamAuthenticator({
+      apikey: global.env.IBM_API_KEY,
+    }),
+    url: 'https://api.kr-seo.visual-recognition.watson.cloud.ibm.com/instances/e0cb1977-6d5e-4ad9-87a1-d977c63477e6',
+  });
 
 app.use(morgan('combined'))
 app.use (express.json())
@@ -143,10 +155,29 @@ app.post('/login',
             TOKEN_SECRET
         )
 
+        // TESTING IBM
+        const classifyParams = {
+            imagesFile: fs.createReadStream('./images/winelabel.jpg'),
+            owners: ['me'],
+            threshold: 0.5,
+            classifierIds: ['food'],
+        };
+          
+          visualRecognition.classify(classifyParams)
+            .then(response => {
+              const classifiedImages = response.result;
+              console.log(JSON.stringify(classifiedImages, null, 2));
+            })
+            .catch(err => {
+              console.log('error:', err);
+            });
+
         resp.status(200)
         resp.type('application/json')
         resp.json({message: 'login on this date', token})
     }
+
+    
 )
 
 // adhoc auth check
@@ -249,8 +280,10 @@ app.post('/saveWine', multipart.single('image-file'),
 
         const wineID = req.query.wineID;
         const userName = req.query.userName;
-        const digitalOceanKey = req.file.filename
         const wineName = req.query.wineName
+        const country = req.query.country
+
+        const digitalOceanKey = req.file?.filename
         
         const conn = await pool.getConnection()
         try {
@@ -258,34 +291,35 @@ app.post('/saveWine', multipart.single('image-file'),
             await conn.beginTransaction() // to prevent only one DB from being updated
     
             // post to digital ocean
-            fs.readFile(req.file.path, async (err, imgFile) => {
-            
-                const params = {
-                    Bucket: 'day25todo',
-                    Key: req.file.filename,
-                    Body: imgFile,
-                    ACL: 'public-read',
-                    ContentType: req.file.mimetype,
-                    ContentLength: req.file.size,
-                    Metadata: {
-                        originalName: req.file.originalname,
-                        author: 'alvin',
-                        update: 'image',
-                    }
-                }
-                // post to digital ocean continued
-                s3.putObject(params, (error, result) => {
-    
-                    // return resp.status(200)
-                    // .type('application/json')
-                    // .json({ 'key': req.file.filename });
-                })
-            })
+            if (req.file != null){
 
+                fs.readFile(req.file.path, async (err, imgFile) => {
+                
+                    const params = {
+                        Bucket: 'lol-bucket',
+                        Key: req.file.filename,
+                        Body: imgFile,
+                        ACL: 'public-read',
+                        ContentType: req.file.mimetype,
+                        ContentLength: req.file.size,
+                        Metadata: {
+                            originalName: req.file.originalname,
+                            author: 'alvin',
+                            update: 'image',
+                        }
+                    }
+                    // post to digital ocean continued
+                    s3.putObject(params, (error, result) => {
+        
+                        // return resp.status(200)
+                        // .type('application/json')
+                        // .json({ 'key': req.file.filename });
+                    })
+                })
+            }
             // post to SQL
-            console.info('DO KEEYYYYY', req.file.filename)
             await conn.query(
-                SQL_SAVE_WINE, [wineID, wineName, userName, digitalOceanKey],
+                SQL_SAVE_WINE, [wineID, wineName, country, userName, digitalOceanKey],
             )
 
                 
@@ -295,9 +329,30 @@ app.post('/saveWine', multipart.single('image-file'),
             resp.json()
     
         } catch(e) {
+
+
+            // delete image from digital ocean
+            console.info('file', req.file)
+            if (req.file != null){
+                console.info('deleting from ocean')
+                var params = {
+                    Bucket: 'lol-bucket',
+                    Key: req.file?.filename
+                };
+                s3.deleteObject(params, function (err, data) {
+                    if (!err) {
+                        console.log('deleted ', data); // sucessful response
+                    } else {
+                        console.log(err); // an error ocurred
+                    }
+                });
+    
+            }
+
             conn.rollback()
             resp.status(500).send(e)
             resp.end()
+
         } finally {
             conn.release()
         }
@@ -321,3 +376,24 @@ app.get('/favourites/:userName', async (req, resp) => {
 		conn.release()
 	}
 })
+
+app.get('/countryCount/:userName', async (req, resp) => {
+
+	const userName = req.params.userName
+	const conn = await pool.getConnection()
+	try {
+		const [ result, _ ] = await conn.query(SQL_COUNT_DISTINCT_COUNTRIES, [userName])
+		resp.status(200)
+		resp.type('application/json').send(result)
+	} catch(e) {
+		console.error('ERROR: ', e)
+		resp.status(500)
+		resp.end()
+	} finally {
+		conn.release()
+	}
+})
+
+app.use(
+    express.static(__dirname + '/static')
+)
