@@ -31,6 +31,8 @@ const app = express();
 const SQL_COUNT_DISTINCT_COUNTRIES = 'SELECT country, count(*) FROM favouritewines WHERE username = ? GROUP BY country order by count(*) desc;'
 const SQL_SAVE_WINE = 'insert into favouritewines (wineID, wineName, country, userName, digitalOceanKey ) values (?,?,?,?, ?);'
 const SQL_SELECT_ALL_FROM_FAVOURITES_WHERE_USERNAME = 'select * from favouritewines where userName = ?;'
+const SQL_SELECT_ALL_FROM_FAVOURITES_WHERE_ID = 'select * from favouritewines where ID = ?;'
+const SQL_DELETE_FAVOURITE_WINE = 'delete from favouritewines where ID = ?;'
 
 const VisualRecognitionV3 = require('ibm-watson/visual-recognition/v3');
 const { IamAuthenticator } = require('ibm-watson/auth');
@@ -88,14 +90,26 @@ passport.use(
 )
 
 // create SQL connection pool
-const pool = mysql.createPool({
-	host: process.env.DB_HOST || 'localhost',
-	port: parseInt(process.env.DB_PORT) || 3306,
-	database: 'lol',
-	user: global.env.DB_USER || process.env.DB_USER,
-	password: global.env.DB_PASSWORD || process.env.DB_PASSWORD,
-	connectionLimit: 4
-})
+
+    const pool = mysql.createPool({
+        host: process.env.DB_HOST || 'localhost',
+        port: parseInt(process.env.DB_PORT) || 3306,
+        database: 'lol',
+        user: global.env.DB_USER || process.env.DB_USER,
+        password: global.env.DB_PASSWORD || process.env.DB_PASSWORD,
+        connectionLimit: 4
+
+        // host: 'db-mysql-sgp1-lol-do-user-8415242-0.b.db.ondigitalocean.com',
+        // port: 25060,
+        // database: 'defaultdb',
+        // user: global.env.DO_USER || process.env.DO_USER,
+        // password: global.env.DO_PASSWORD || process.env.DO_PASSWORD,
+        // connectionLimit: 4,
+        // sslmode: 'REQUIRED'    
+    })
+
+
+
 
 const startApp = async (app, pool) => {
 	const conn = await pool.getConnection()
@@ -423,7 +437,7 @@ app.get('/pictureRecognition/:digitalOceanKey', async (req, resp) => {
     const classifyParams = {
         url: 'https://picturerecognition.ams3.digitaloceanspaces.com/'+digitalOceanKey,
         owners: ['me'],
-        threshold: 0.6,
+        threshold: 0.7,
         classifierIds: ['food'],
     };
     
@@ -437,6 +451,56 @@ app.get('/pictureRecognition/:digitalOceanKey', async (req, resp) => {
         console.log('error:', err);
     });   
 })
+
+app.post('/deleteSavedWine',
+    async (req, resp) => {
+        
+        const ID = req.body.ID
+        
+        const conn = await pool.getConnection()
+        try {
+            await conn.beginTransaction() // to prevent only one DB from being updated
+            const [ result, _ ] = await conn.query(SQL_SELECT_ALL_FROM_FAVOURITES_WHERE_ID, [ID])
+
+
+            // delete image from digital ocean
+            if (result[0].digitalOceanKey != null || result[0].digitalOceanKey != ""){
+                var params = {
+                    Bucket: 'lol-bucket',
+                    Key: result[0].digitalOceanKey
+                };
+                s3.deleteObject(params, function (err, data) {
+                    if (!err) {
+                        console.log('deleted ', data); // sucessful response
+                    } else {
+                        console.log(err); // an error ocurred
+                    }
+                });
+            }
+    
+            // delete from SQL
+            await conn.query(
+                SQL_DELETE_FAVOURITE_WINE, [ID],
+            )
+                
+            await conn.commit()
+    
+            resp.status(200)
+            resp.json()
+        }
+    
+    
+        catch(e) {
+            conn.rollback()
+            resp.status(500).send(e)
+            resp.end()
+
+        } finally {
+            conn.release()
+        }
+
+    }    
+);
 
 app.use(
     express.static(__dirname + '/static')
