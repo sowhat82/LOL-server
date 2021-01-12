@@ -11,11 +11,11 @@ var multipart = multer({dest: 'uploads/'});
 const config = require('./config.json');
 AWS.config.credentials = new AWS.SharedIniFileCredentials('lol-bucket');
 const endpoint = new AWS.Endpoint('ams3.digitaloceanspaces.com');
+
 const s3 = new AWS.S3({
     endpoint: endpoint,
     accessKeyId: config.accessKeyId || process.env.ACCESS_KEY,
-    secretAccessKey: config.secretAccessKey
-    || process.env.SECRET_ACCESS_KEY
+    secretAccessKey: config.secretAccessKey || process.env.SECRET_ACCESS_KEY
 });
 
 const morgan = require('morgan')
@@ -36,6 +36,23 @@ const SQL_DELETE_FAVOURITE_WINE = 'delete from favouritewines where ID = ?;'
 
 const VisualRecognitionV3 = require('ibm-watson/visual-recognition/v3');
 const { IamAuthenticator } = require('ibm-watson/auth');
+
+const s3delete = function (params) {
+    return new Promise((resolve, reject) => {
+        s3.createBucket({
+            Bucket: 'lol-bucket'        /* Put your bucket name */
+        }, function () {
+            s3.deleteObject(params, function (err, data) {
+                if (err) console.log(err);
+                else
+                    console.log(
+                        "Successfully deleted file from bucket"
+                    );
+                console.log(data);
+            });
+        });
+    });
+};
 
 const visualRecognition = new VisualRecognitionV3({
     version: '2018-03-19',
@@ -107,9 +124,6 @@ passport.use(
         // connectionLimit: 4,
         // sslmode: 'REQUIRED'    
     })
-
-
-
 
 const startApp = async (app, pool) => {
 	const conn = await pool.getConnection()
@@ -317,33 +331,19 @@ app.post('/saveWine', multipart.single('image-file'),
             await conn.query(
                 SQL_SAVE_WINE, [wineID, wineName, country, userName, digitalOceanKey],
             )
-
-                
-            await conn.commit()
-    
+          
+            await conn.commit()    
             resp.status(200)
             resp.json()
     
         } catch(e) {
+            
+            const params2 = {
+                Bucket: 'lol-bucket',   
+                Key: req.file.filename               
+              };
 
-
-            // delete image from digital ocean
-            console.info('file', req.file)
-            if (req.file != null){
-                console.info('deleting from ocean')
-                var params = {
-                    Bucket: 'lol-bucket',
-                    Key: req.file?.filename
-                };
-                s3.deleteObject(params, function (err, data) {
-                    if (!err) {
-                        console.log('deleted ', data); // sucessful response
-                    } else {
-                        console.log(err); // an error ocurred
-                    }
-                });
-    
-            }
+            s3delete(params2)
 
             conn.rollback()
             resp.status(500).send(e)
@@ -464,19 +464,12 @@ app.post('/deleteSavedWine',
 
 
             // delete image from digital ocean
-            if (result[0].digitalOceanKey != null || result[0].digitalOceanKey != ""){
-                var params = {
-                    Bucket: 'lol-bucket',
-                    Key: result[0].digitalOceanKey
-                };
-                s3.deleteObject(params, function (err, data) {
-                    if (!err) {
-                        console.log('deleted ', data); // sucessful response
-                    } else {
-                        console.log(err); // an error ocurred
-                    }
-                });
-            }
+            const params2 = {
+                Bucket: 'lol-bucket',   
+                Key: result[0].digitalOceanKey               
+              };
+
+            s3delete(params2)
     
             // delete from SQL
             await conn.query(
