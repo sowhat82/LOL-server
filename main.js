@@ -536,14 +536,6 @@ app.use(
     express.static(__dirname + '/static')
 )
 
-app.get('/googledrive', async (req, resp) => {
-
-        resp.status(200)
-        resp.type('application/json')
-        resp.json({key: 'ok'})
-
-})
-
 
 //create a bot
 const bot = new Telegraf(global.env.TELEGRAM_TOKEN)
