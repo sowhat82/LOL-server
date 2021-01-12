@@ -109,20 +109,20 @@ passport.use(
 // create SQL connection pool
 
     const pool = mysql.createPool({
-        host: process.env.DB_HOST || 'localhost',
-        port: parseInt(process.env.DB_PORT) || 3306,
-        database: 'lol',
-        user: global.env.DB_USER || process.env.DB_USER,
-        password: global.env.DB_PASSWORD || process.env.DB_PASSWORD,
-        connectionLimit: 4
+        // host: process.env.DB_HOST || 'localhost',
+        // port: parseInt(process.env.DB_PORT) || 3306,
+        // database: 'lol',
+        // user: global.env.DB_USER || process.env.DB_USER,
+        // password: global.env.DB_PASSWORD || process.env.DB_PASSWORD,
+        // connectionLimit: 4
 
-        // host: 'db-mysql-sgp1-lol-do-user-8415242-0.b.db.ondigitalocean.com',
-        // port: 25060,
-        // database: 'defaultdb',
-        // user: global.env.DO_USER || process.env.DO_USER,
-        // password: global.env.DO_PASSWORD || process.env.DO_PASSWORD,
-        // connectionLimit: 4,
-        // sslmode: 'REQUIRED'    
+        host: 'db-mysql-sgp1-lol-do-user-8415242-0.b.db.ondigitalocean.com',
+        port: 25060,
+        database: 'defaultdb',
+        user: global.env.DO_USER || process.env.DO_USER,
+        password: global.env.DO_PASSWORD || process.env.DO_PASSWORD,
+        connectionLimit: 4,
+        sslmode: 'REQUIRED'    
     })
 
 const startApp = async (app, pool) => {
