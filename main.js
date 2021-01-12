@@ -149,6 +149,14 @@ const startApp = async (app, pool) => {
 	}
 }
 
+// Web socket
+const expressWS = require('express-ws')
+const ROOM = {}
+const appWS = expressWS(app)
+
+// Imports the Google Cloud client libraries
+const vision = require('@google-cloud/vision');
+
 // start the app
 startApp(app, pool)
 
@@ -184,7 +192,8 @@ app.set('views', './dist/lol/browser');
 
 app.post('/login', 
 // passport.authenticate('local', {session: false}),
-    (req, resp, next)=>{
+    async (req, resp, next)=>{
+
         const func = passport.authenticate('local',
             (err, user, info)=>{
                 if (null != err || !user) {
@@ -467,7 +476,7 @@ app.post('/uploadPictureRecognition', multipart.single('image-file'),
     }    
 );
 
-app.get('/pictureRecognition/:digitalOceanKey', async (req, resp) => {
+app.get('/IbmPictureRecognition/:digitalOceanKey', async (req, resp) => {
 
     const digitalOceanKey = req.params['digitalOceanKey']
     // IBM watson pic recognition
@@ -487,6 +496,20 @@ app.get('/pictureRecognition/:digitalOceanKey', async (req, resp) => {
     .catch(err => {
         console.log('error:', err);
     });   
+})
+
+app.get('/googlePictureRecognition/:digitalOceanKey', async (req, resp) => {
+
+    const digitalOceanKey = req.params['digitalOceanKey']
+    // Google Vision pic recognition
+
+    const client = new vision.ImageAnnotatorClient();
+    const [result] = await client.textDetection('https://picturerecognition.ams3.digitaloceanspaces.com/'+digitalOceanKey);
+    const detections = result.textAnnotations;
+    // console.log('Text:');
+    // detections.forEach(text => console.log(text));
+    
+    resp.json(detections[0])
 })
 
 app.post('/deleteSavedWine',
@@ -617,3 +640,48 @@ bot.use((ctx, next) => {
 
 // start the bot
 bot.launch()
+
+// websocket
+app.ws('/chat', (ws, req) => {
+    const name = req.query.name
+    console.info(`New webscoket connection: ${name}`)
+    // add the web socket connection to the room
+    ws.particpantName = name
+    ROOM[name] = ws
+
+    const chat = JSON.stringify({
+        from: name,
+        message: 'is in the houzzz!',
+        timeStamp: (new Date()).toString()
+    })
+    
+    for (let p in ROOM) {
+        ROOM[p].send(chat)
+    }
+
+
+    // construct the received message and broadcast back out
+    ws.on('message', (payload) => {
+
+        const chat = JSON.stringify({
+            from: name,
+            message: payload,
+            timeStamp: (new Date()).toString()
+        })
+
+        // loop through all active websocket subscriptions and push them the message
+        for (let p in ROOM) {
+            ROOM[p].send(chat)
+        }
+    })
+
+    ws.on('close', ()=>{
+        console.info(`Closing connection for ${name}`)
+
+        ROOM[name].close()
+        // remove name from the room
+        delete ROOM[name]
+    })
+
+})
+
