@@ -167,7 +167,7 @@ require('zone.js/dist/zone-node');
 const ngUniversal = require('@nguniversal/express-engine');
 
 /* The server bundle is loaded here, it's why you don't want a changing hash in it */
-const appServer = require('./dist/lol/server/main');
+const appServer = require('./dist/lol/server/main.js');
 
 /* Server-side rendering */
 function angularRouter(req, res) {
