@@ -34,7 +34,7 @@ const PORT = parseInt(process.argv[2]) || parseInt(process.env.PORT) || 3000
 const jwt = require('jsonwebtoken')
 const TOKEN_SECRET = global.env.TOKEN_SECRET || 'secret'
 const app = express();
-app.use(cors())
+// app.use(cors())
 const SQL_COUNT_DISTINCT_COUNTRIES = 'SELECT wineName, count(*) FROM favouritewines WHERE username = ? GROUP BY wineName order by count(*) desc;'
 const SQL_SAVE_WINE = 'insert into favouritewines (wineID, wineName, wineName, userName, digitalOceanKey ) values (?,?,?,?, ?);'
 const SQL_SELECT_ALL_FROM_FAVOURITES_WHERE_USERNAME = 'select * from favouritewines where userName = ?;'
