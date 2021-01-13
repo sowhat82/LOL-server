@@ -405,6 +405,49 @@ app.get('/countryCount/:userName', async (req, resp) => {
 	}
 })
 
+app.post('/deleteSavedWine',
+    async (req, resp) => {
+
+        const ID = req.body.ID
+
+        const conn = await pool.getConnection()
+        try {
+            await conn.beginTransaction() // to prevent only one DB from being updated
+            const [ result, _ ] = await conn.query(SQL_SELECT_ALL_FROM_FAVOURITES_WHERE_ID, [ID])
+
+
+            // delete image from digital ocean
+            const params2 = {
+                Bucket: 'lol-bucket',   
+                Key: result[0].digitalOceanKey               
+              };
+
+            s3delete(params2)
+
+            // delete from SQL
+            await conn.query(
+                SQL_DELETE_FAVOURITE_WINE, [ID],
+            )
+
+            await conn.commit()
+
+            resp.status(200)
+            resp.json()
+        }
+
+
+        catch(e) {
+            conn.rollback()
+            resp.status(500).send(e)
+            resp.end()
+
+        } finally {
+            conn.release()
+        }
+
+    }    
+);
+
 app.post('/uploadPictureRecognition', multipart.single('image-file'),
     async (req, resp) => {
         try {
@@ -480,6 +523,130 @@ app.get('/googlePictureRecognition/:digitalOceanKey', async (req, resp) => {
 
     resp.json(detections[0])
 })
+
+
+//create a bot
+const bot = new Telegraf(global.env.TELEGRAM_TOKEN)
+
+// when a user starts a session with the bot
+bot.start(ctx => {
+    ctx.reply('Welcome to Wine Bot. Type /wine <wine name> to begin')
+})
+
+bot.hears('hi', ctx => ctx.reply ('Hi there! Type /wine <wine name> to begin'))
+
+bot.command('wine', async ctx => {
+
+    const wine = ctx.message.text.substring(6)
+
+    // display the menu if no wineName is specified with the command
+    if (wine.length>=0){
+        fetchWine(wine, ctx)
+    }
+})
+
+const fetchWine = async (wine, ctx) => {
+
+    ctx.reply(`Retrieving top 3 search results for "${wine}"`)
+
+    const result = await fetch(`https://quiniwine.com/api/pub/wineKeywordSearch/${wine}/0/3`, {
+        headers: {
+            'Authorization': 'Bearer ' + global.env.QUINI_API_KEY
+        }
+    }) 
+
+    const quiniapiresult =  await result.json() 
+
+    // the below works to move certain elements from an array to a new array
+    const results = quiniapiresult.items.map(              //length of new array will be the same
+                (d)=> {
+                    return {wineID: d.id, name: d.Name, country: d.Country, varietal: d.Varietal, vintage: d.vintage, type: d.Type}          
+                }
+    )
+
+    var wineDetailsArray = []
+    for(var i=0; i < results.length; i++) {
+
+        const result = await fetch(`https://quiniwine.com/api/pub/wineSummary.json?wine_id=${results[i].wineID}`, {
+            headers: {
+                'Accept': 'application/json',
+                'Authorization': 'Bearer ' + global.env.QUINI_API_KEY
+            }
+        }) 
+        const wineDetailsResult = await result.json()
+        wineDetailsArray.push(wineDetailsResult)
+    }
+
+    console.info(wineDetailsArray[0])
+
+
+    for(var i=0; i < results.length; i++) {
+        ctx.reply(
+            results[i].name +" "+ results[i].varietal+ '\n\n' 
+            + "Country: " + results[i].country + '\n' 
+            + "Year: " + results[i].vintage + '\n' 
+            + "Type: " + results[i].type + '\n' 
+            + "Score: " + wineDetailsArray[i].aggregate?.scoreAvg[0] + '\n'
+            + "Description: " + wineDetailsArray[i].agg_summary?.textReviews.mouth
+        )
+    }
+}
+
+bot.use((ctx, next) => {
+    if (ctx.callbackQuery != null) {
+        const wine = ctx.callbackQuery.data.substring(1)
+        return fetchWine(wine, ctx)
+    }
+    next()
+})
+
+// start the bot
+bot.launch()
+
+// websocket
+app.ws('/chat', (ws, req) => {
+    const name = req.query.name
+    console.info(`New webscoket connection: ${name}`)
+    // add the web socket connection to the room
+    ws.particpantName = name
+    ROOM[name] = ws
+
+    const chat = JSON.stringify({
+        from: name,
+        message: 'is in the houzzz!',
+        timeStamp: (new Date()).toString()
+    })
+
+    for (let p in ROOM) {
+        ROOM[p].send(chat)
+    }
+
+
+    // construct the received message and broadcast back out
+    ws.on('message', (payload) => {
+
+        const chat = JSON.stringify({
+            from: name,
+            message: payload,
+            timeStamp: (new Date()).toString()
+        })
+
+        // loop through all active websocket subscriptions and push them the message
+        for (let p in ROOM) {
+            ROOM[p].send(chat)
+        }
+    })
+
+    ws.on('close', ()=>{
+        console.info(`Closing connection for ${name}`)
+
+        ROOM[name].close()
+        // remove name from the room
+        delete ROOM[name]
+    })
+
+})
+
 
 app.use(
     express.static(__dirname + '/static')
