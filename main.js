@@ -445,14 +445,14 @@ app.post('/uploadPictureRecognition', multipart.single('image-file'),
     }    
 );
 
-app.get('/pictureRecognition/:digitalOceanKey', async (req, resp) => {
+app.get('/IbmPictureRecognition/:digitalOceanKey', async (req, resp) => {
 
     const digitalOceanKey = req.params['digitalOceanKey']
     // IBM watson pic recognition
     const classifyParams = {
         url: 'https://picturerecognition.ams3.digitaloceanspaces.com/'+digitalOceanKey,
         owners: ['me'],
-        threshold: 0.6,
+        threshold: 0.7,
         classifierIds: ['food'],
     };
     
@@ -465,6 +465,20 @@ app.get('/pictureRecognition/:digitalOceanKey', async (req, resp) => {
     .catch(err => {
         console.log('error:', err);
     });   
+})
+
+app.get('/googlePictureRecognition/:digitalOceanKey', async (req, resp) => {
+
+    const digitalOceanKey = req.params['digitalOceanKey']
+    // Google Vision pic recognition
+
+    const client = new vision.ImageAnnotatorClient();
+    const [result] = await client.textDetection('https://picturerecognition.ams3.digitaloceanspaces.com/'+digitalOceanKey);
+    const detections = result.textAnnotations;
+    // console.log('Text:');
+    // detections.forEach(text => console.log(text));
+
+    resp.json(detections[0])
 })
 
 app.use(
