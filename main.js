@@ -11,7 +11,6 @@ const AWS = require('aws-sdk');
 const fs = require('fs')
 var multer = require('multer');
 var multipart = multer({dest: 'uploads/'});
-// const config = require('./config.json');
 const secureEnv = require('secure-env')
 global.env = secureEnv({secret:'mySecretPassword'})
 const TOKEN_SECRET = global.env.TOKEN_SECRET || 'secret'
@@ -33,9 +32,28 @@ const PORT = parseInt(process.argv[2]) || parseInt(process.env.PORT) || 3000
 const jwt = require('jsonwebtoken')
 const app = express();
 
-const SQL_COUNT_DISTINCT_COUNTRIES = 'SELECT country, count(*) FROM favouritewines WHERE username = ? GROUP BY country order by count(*) desc;'
-const SQL_SAVE_WINE = 'insert into favouritewines (wineID, wineName, country, userName, digitalOceanKey ) values (?,?,?,?, ?);'
+const SQL_COUNT_DISTINCT_COUNTRIES = 'SELECT wineName, count(*) FROM favouritewines WHERE username = ? GROUP BY wineName order by count(*) desc;'
+const SQL_SAVE_WINE = 'insert into favouritewines (wineID, wineName, wineName, userName, digitalOceanKey ) values (?,?,?,?, ?);'
 const SQL_SELECT_ALL_FROM_FAVOURITES_WHERE_USERNAME = 'select * from favouritewines where userName = ?;'
+const SQL_SELECT_ALL_FROM_FAVOURITES_WHERE_ID = 'select * from favouritewines where ID = ?;'
+const SQL_DELETE_FAVOURITE_WINE = 'delete from favouritewines where ID = ?;'
+
+const s3delete = function (params) {
+    return new Promise((resolve, reject) => {
+        s3.createBucket({
+            Bucket: 'lol-bucket'        /* Put your bucket name */
+        }, function () {
+            s3.deleteObject(params, function (err, data) {
+                if (err) console.log(err);
+                else
+                    console.log(
+                        "Successfully deleted file from bucket"
+                    );
+                console.log(data);
+            });
+        });
+    });
+};
 
 const VisualRecognitionV3 = require('ibm-watson/visual-recognition/v3');
 const { IamAuthenticator } = require('ibm-watson/auth');
