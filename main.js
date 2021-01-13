@@ -57,7 +57,6 @@ const s3delete = function (params) {
 
 const VisualRecognitionV3 = require('ibm-watson/visual-recognition/v3');
 const { IamAuthenticator } = require('ibm-watson/auth');
-
 const visualRecognition = new VisualRecognitionV3({
     version: '2018-03-19',
     authenticator: new IamAuthenticator({
