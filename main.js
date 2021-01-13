@@ -117,8 +117,8 @@ const pool = mysql.createPool({
         // password: global.env.DB_PASSWORD || process.env.DB_PASSWORD,
         // connectionLimit: 4
 
-        host: 'db-mysql-sgp1-lol-do-user-8415242-0.b.db.ondigitalocean.com',
-        port: 25060,
+        host: global.env.MYSQL_SERVER,
+        port: global.env.MYSQL_SVR_PORT,
         database: 'lol',
         user: global.env.DO_USER || process.env.DO_USER,
         password: global.env.DO_PASSWORD || process.env.DO_PASSWORD,
