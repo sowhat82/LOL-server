@@ -526,91 +526,87 @@ app.post('/deleteSavedWine',
     }    
 );
 
-app.use(
-    express.static(__dirname + '/static')
-)
-
 
 //create a bot
-const bot = new Telegraf(global.env.TELEGRAM_TOKEN)
-const photoURL = ""
-const newsapiurl = 'http://newsapi.org/v2/top-headlines'
-const apikey = global.env.NEWS_API_KEY
+// const bot = new Telegraf(global.env.TELEGRAM_TOKEN)
+// const photoURL = ""
+// const apikey = global.env.NEWS_API_KEY
 
-// when a user starts a session with the bot
-bot.start(ctx => {
-    ctx.reply('Welcome to Wine Bot. Type /wine <wine name> to begin')
-})
+// // when a user starts a session with the bot
+// bot.start(ctx => {
+//     ctx.reply('Welcome to Wine Bot. Type /wine <wine name> to begin')
+// })
 
-bot.hears('hi', ctx => ctx.reply ('Hi there! Type /wine <wine name> to begin'))
+// bot.hears('hi', ctx => ctx.reply ('Hi there! Type /wine <wine name> to begin'))
 
-bot.command('wine', async ctx => {
+// bot.command('wine', async ctx => {
     
-    const wine = ctx.message.text.substring(6)
+//     const wine = ctx.message.text.substring(6)
 
-    // display the menu if no wineName is specified with the command
-    if (wine.length>=0){
-        fetchWine(wine, ctx)
-    }
-})
+//     // display the menu if no wineName is specified with the command
+//     if (wine.length>=0){
+//         fetchWine(wine, ctx)
+//     }
+// })
 
-const fetchWine = async (wine, ctx) => {
+// const fetchWine = async (wine, ctx) => {
 
-    ctx.reply(`Retrieving top 3 search results for "${wine}"`)
+//     ctx.reply(`Retrieving top 3 search results for "${wine}"`)
 
-    const result = await fetch(`https://quiniwine.com/api/pub/wineKeywordSearch/${wine}/0/3`, {
-        headers: {
-            'Authorization': 'Bearer ' + global.env.QUINI_API_KEY
-        }
-    }) 
+//     const result = await fetch(`https://quiniwine.com/api/pub/wineKeywordSearch/${wine}/0/3`, {
+//         headers: {
+//             'Authorization': 'Bearer ' + global.env.QUINI_API_KEY
+//         }
+//     }) 
 
-    const quiniapiresult =  await result.json() 
+//     const quiniapiresult =  await result.json() 
 
-    // the below works to move certain elements from an array to a new array
-    const results = quiniapiresult.items.map(              //length of new array will be the same
-                (d)=> {
-                    return {wineID: d.id, name: d.Name, country: d.Country, varietal: d.Varietal, vintage: d.vintage, type: d.Type}          
-                }
-    )
+//     // the below works to move certain elements from an array to a new array
+//     const results = quiniapiresult.items.map(              //length of new array will be the same
+//                 (d)=> {
+//                     return {wineID: d.id, name: d.Name, country: d.Country, varietal: d.Varietal, vintage: d.vintage, type: d.Type}          
+//                 }
+//     )
 
-    var wineDetailsArray = []
-    for(var i=0; i < results.length; i++) {
+//     var wineDetailsArray = []
+//     for(var i=0; i < results.length; i++) {
 
-        const result = await fetch(`https://quiniwine.com/api/pub/wineSummary.json?wine_id=${results[i].wineID}`, {
-            headers: {
-                'Accept': 'application/json',
-                'Authorization': 'Bearer ' + global.env.QUINI_API_KEY
-            }
-        }) 
-        const wineDetailsResult = await result.json()
-        wineDetailsArray.push(wineDetailsResult)
-    }
+//         const result = await fetch(`https://quiniwine.com/api/pub/wineSummary.json?wine_id=${results[i].wineID}`, {
+//             headers: {
+//                 'Accept': 'application/json',
+//                 'Authorization': 'Bearer ' + global.env.QUINI_API_KEY
+//             }
+//         }) 
+//         const wineDetailsResult = await result.json()
+//         wineDetailsArray.push(wineDetailsResult)
+//     }
 
-    console.info(wineDetailsArray[0])
+//     console.info(wineDetailsArray[0])
 
 
-    for(var i=0; i < results.length; i++) {
-        ctx.reply(
-            results[i].name +" "+ results[i].varietal+ '\n\n' 
-            + "Country: " + results[i].country + '\n' 
-            + "Year: " + results[i].vintage + '\n' 
-            + "Type: " + results[i].type + '\n' 
-            + "Score: " + wineDetailsArray[i].aggregate?.scoreAvg[0] + '\n'
-            + "Description: " + wineDetailsArray[i].agg_summary?.textReviews.mouth
-        )
-    }
-}
+//     for(var i=0; i < results.length; i++) {
+//         ctx.reply(
+//             results[i].name +" "+ results[i].varietal+ '\n\n' 
+//             + "Country: " + results[i].country + '\n' 
+//             + "Year: " + results[i].vintage + '\n' 
+//             + "Type: " + results[i].type + '\n' 
+//             + "Score: " + wineDetailsArray[i].aggregate?.scoreAvg[0] + '\n'
+//             + "Description: " + wineDetailsArray[i].agg_summary?.textReviews.mouth
+//         )
+//     }
+// }
 
-bot.use((ctx, next) => {
-    if (ctx.callbackQuery != null) {
-        const wine = ctx.callbackQuery.data.substring(1)
-        return fetchWine(wine, ctx)
-    }
-    next()
-})
+// bot.use((ctx, next) => {
+//     if (ctx.callbackQuery != null) {
+//         const wine = ctx.callbackQuery.data.substring(1)
+//         return fetchWine(wine, ctx)
+//     }
+//     next()
+// })
 
-// start the bot
-bot.launch()
+// // start the bot
+// bot.launch()
+
 
 // websocket
 app.ws('/chat', (ws, req) => {
