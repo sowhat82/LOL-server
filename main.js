@@ -32,7 +32,7 @@ const PORT = parseInt(process.argv[2]) || parseInt(process.env.PORT) || 3000
 const jwt = require('jsonwebtoken')
 const app = express();
 
-const SQL_COUNT_DISTINCT_COUNTRIES = 'SELECT wineName, count(*) FROM favouritewines WHERE username = ? GROUP BY wineName order by count(*) desc;'
+const SQL_COUNT_DISTINCT_COUNTRIES = 'SELECT country, count(*) FROM favouritewines WHERE username = ? GROUP BY country order by count(*) desc;'
 const SQL_SAVE_WINE = 'insert into favouritewines (wineID, wineName, country, userName, digitalOceanKey ) values (?,?,?,?, ?);'
 const SQL_SELECT_ALL_FROM_FAVOURITES_WHERE_USERNAME = 'select * from favouritewines where userName = ?;'
 const SQL_SELECT_ALL_FROM_FAVOURITES_WHERE_ID = 'select * from favouritewines where ID = ?;'
@@ -84,7 +84,6 @@ passport.use(
             const conn = await pool.getConnection()
             const [ result, _ ] = await conn.query( 'select userName from users where userName = ? and password = sha1(?)', [username, password],)
 
-            console.info('result', result.length)
             if (result.length) {
 
                 authResult = true
@@ -231,7 +230,7 @@ app.get('/protected/secret',
         catch(e){
             resp.status(403)
             resp.json({message: 'Incorrect token', error: e})
-            return
+           return
         }
     },
 
@@ -245,7 +244,6 @@ app.get('/searchResults/', async (req, resp) => {
 
 
     const searchText = req.query['wineName']
-    console.info(searchText)
     const skip = req.query['offset']
     const limit = req.query['limit']
     try{
@@ -256,7 +254,6 @@ app.get('/searchResults/', async (req, resp) => {
         }
         ) 
 
-        // console.info(result)
         const quiniapiresult =  await result.json() 
     
         resp.status(200)
@@ -452,7 +449,8 @@ app.post('/uploadPictureRecognition', multipart.single('image-file'),
             // post to digital ocean
             if (req.file != null){
 
-                await fs.readFile(req.file.path, async (err, imgFile) => {         
+                console.info(req.file.path)
+                await fs.readFile(req.file.path, async (err, imgFile) => {      
                     const params = {
                         Bucket: 'picturerecognition',
                         Key: req.file.filename,
@@ -468,12 +466,20 @@ app.post('/uploadPictureRecognition', multipart.single('image-file'),
                     }
                     // post to digital ocean continued
                     await s3.putObject(params, (error, result) => {
-        
                         // return resp.status(200)
                         // .type('application/json')    
                         // .json({ 'key': req.file.filename });
                     })
 
+                    var result = 0
+                    do{
+                        result = await fetch('https://picturerecognition.ams3.digitaloceanspaces.com/'+req.file.filename, {
+                            headers: {
+                                'Accept': 'application/json'
+                            }
+                        })    
+                    } while(result.status != 200)
+                    
                     resp.status(200)
                     resp.json(req.file.filename)
                 })
@@ -510,11 +516,16 @@ app.get('/IbmPictureRecognition/:digitalOceanKey', async (req, resp) => {
 
 app.get('/googlePictureRecognition/:digitalOceanKey', async (req, resp) => {
 
+
     const digitalOceanKey = req.params['digitalOceanKey']
+
     // Google Vision pic recognition
 
     const client = new vision.ImageAnnotatorClient();
+
     const [result] = await client.textDetection('https://picturerecognition.ams3.digitaloceanspaces.com/'+digitalOceanKey);
+
+    console.info([result])
     const detections = result.textAnnotations;
     // console.log('Text:');
     // detections.forEach(text => console.log(text));
@@ -574,9 +585,6 @@ const fetchWine = async (wine, ctx) => {
         const wineDetailsResult = await result.json()
         wineDetailsArray.push(wineDetailsResult)
     }
-
-    console.info(wineDetailsArray[0])
-
 
     for(var i=0; i < results.length; i++) {
         ctx.reply(
