@@ -8,24 +8,26 @@ const AWS = require('aws-sdk');
 const fs = require('fs')
 var multer = require('multer');
 var multipart = multer({dest: 'uploads/'});
-const config = require('./config.json');
+// const config = require('./config.json');
+const secureEnv = require('secure-env')
+global.env = secureEnv({secret:'mySecretPassword'})
+const TOKEN_SECRET = global.env.TOKEN_SECRET || 'secret'
 AWS.config.credentials = new AWS.SharedIniFileCredentials('lol-bucket');
 const endpoint = new AWS.Endpoint('ams3.digitaloceanspaces.com');
 const s3 = new AWS.S3({
     endpoint: endpoint,
-    accessKeyId: config.accessKeyId || process.env.ACCESS_KEY,
-    secretAccessKey: config.secretAccessKey
-    || process.env.SECRET_ACCESS_KEY
+    // accessKeyId: config.accessKeyId || process.env.ACCESS_KEY,
+    // secretAccessKey: config.secretAccessKey|| process.env.SECRET_ACCESS_KEY
+    accessKeyId: global.env.accessKeyId,
+    secretAccessKey: global.env.secretAccessKey
+
 });
 
 const morgan = require('morgan')
 const express = require('express');
 const mysql = require('mysql2/promise')
-const secureEnv = require('secure-env')
 const PORT = parseInt(process.argv[2]) || parseInt(process.env.PORT) || 3000
 const jwt = require('jsonwebtoken')
-global.env = secureEnv({secret:'mySecretPassword'})
-const TOKEN_SECRET = global.env.TOKEN_SECRET || 'secret'
 const app = express();
 
 const SQL_COUNT_DISTINCT_COUNTRIES = 'SELECT country, count(*) FROM favouritewines WHERE username = ? GROUP BY country order by count(*) desc;'
