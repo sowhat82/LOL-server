@@ -128,6 +128,14 @@ const pool = mysql.createPool({
         sslmode: 'REQUIRED' 
 })
 
+// Web socket
+const expressWS = require('express-ws')
+const ROOM = {}
+const appWS = expressWS(app)
+
+// Imports the Google Cloud client libraries
+const vision = require('@google-cloud/vision');
+
 const startApp = async (app, pool) => {
 	const conn = await pool.getConnection()
 	try {
@@ -345,22 +353,12 @@ app.post('/saveWine', multipart.single('image-file'),
 
 
             // delete image from digital ocean
-            console.info('file', req.file)
-            if (req.file != null){
-                console.info('deleting from ocean')
-                var params = {
-                    Bucket: 'lol-bucket',
-                    Key: req.file?.filename
-                };
-                s3.deleteObject(params, function (err, data) {
-                    if (!err) {
-                        console.log('deleted ', data); // sucessful response
-                    } else {
-                        console.log(err); // an error ocurred
-                    }
-                });
-    
-            }
+            const params2 = {
+                Bucket: 'lol-bucket',   
+                Key: req.file.filename               
+              };
+
+            s3delete(params2)
 
             conn.rollback()
             resp.status(500).send(e)
