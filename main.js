@@ -1,65 +1,39 @@
-const {Telegraf} = require ('telegraf')
-const {MenuTemplate, MenuMiddleware} = require('telegraf-inline-menu')
-const withquery = require('with-query').default
-
 // passort core
 const passport = require('passport');
 //passport strategy
 const LocalStrategy = require('passport-local').Strategy;
 const fetch = require('node-fetch')
-const cors = require('cors')
 
 const AWS = require('aws-sdk');
 const fs = require('fs')
 var multer = require('multer');
 var multipart = multer({dest: 'uploads/'});
-// const config = require('./config.json');
+const config = require('./config.json');
 AWS.config.credentials = new AWS.SharedIniFileCredentials('lol-bucket');
 const endpoint = new AWS.Endpoint('ams3.digitaloceanspaces.com');
-const secureEnv = require('secure-env')
-global.env = secureEnv({secret:'mySecretPassword'})
-
 const s3 = new AWS.S3({
     endpoint: endpoint,
-    // accessKeyId: config.accessKeyId || process.env.ACCESS_KEY,
-    // secretAccessKey: config.secretAccessKey || process.env.SECRET_ACCESS_KEY
-    accessKeyId: global.env.accessKeyId,
-    secretAccessKey: global.env.secretAccessKey
+    accessKeyId: config.accessKeyId || process.env.ACCESS_KEY,
+    secretAccessKey: config.secretAccessKey
+    || process.env.SECRET_ACCESS_KEY
 });
 
 const morgan = require('morgan')
 const express = require('express');
 const mysql = require('mysql2/promise')
+const secureEnv = require('secure-env')
 const PORT = parseInt(process.argv[2]) || parseInt(process.env.PORT) || 3000
 const jwt = require('jsonwebtoken')
+global.env = secureEnv({secret:'mySecretPassword'})
 const TOKEN_SECRET = global.env.TOKEN_SECRET || 'secret'
 const app = express();
-// app.use(cors())
-const SQL_COUNT_DISTINCT_COUNTRIES = 'SELECT wineName, count(*) FROM favouritewines WHERE username = ? GROUP BY wineName order by count(*) desc;'
-const SQL_SAVE_WINE = 'insert into favouritewines (wineID, wineName, wineName, userName, digitalOceanKey ) values (?,?,?,?, ?);'
+
+const SQL_COUNT_DISTINCT_COUNTRIES = 'SELECT country, count(*) FROM favouritewines WHERE username = ? GROUP BY country order by count(*) desc;'
+const SQL_SAVE_WINE = 'insert into favouritewines (wineID, wineName, country, userName, digitalOceanKey ) values (?,?,?,?, ?);'
 const SQL_SELECT_ALL_FROM_FAVOURITES_WHERE_USERNAME = 'select * from favouritewines where userName = ?;'
-const SQL_SELECT_ALL_FROM_FAVOURITES_WHERE_ID = 'select * from favouritewines where ID = ?;'
-const SQL_DELETE_FAVOURITE_WINE = 'delete from favouritewines where ID = ?;'
 
 const VisualRecognitionV3 = require('ibm-watson/visual-recognition/v3');
 const { IamAuthenticator } = require('ibm-watson/auth');
-
-const s3delete = function (params) {
-    return new Promise((resolve, reject) => {
-        s3.createBucket({
-            Bucket: 'lol-bucket'        /* Put your bucket name */
-        }, function () {
-            s3.deleteObject(params, function (err, data) {
-                if (err) console.log(err);
-                else
-                    console.log(
-                        "Successfully deleted file from bucket"
-                    );
-                console.log(data);
-            });
-        });
-    });
-};
 
 const visualRecognition = new VisualRecognitionV3({
     version: '2018-03-19',
@@ -114,22 +88,14 @@ passport.use(
 )
 
 // create SQL connection pool
-    const pool = mysql.createPool({
-        // host: process.env.DB_HOST || 'localhost',
-        // port: parseInt(process.env.DB_PORT) || 3306,
-        // database: 'lol',
-        // user: global.env.DB_USER || process.env.DB_USER,
-        // password: global.env.DB_PASSWORD || process.env.DB_PASSWORD,
-        // connectionLimit: 4
-
-        host: 'db-mysql-sgp1-lol-do-user-8415242-0.b.db.ondigitalocean.com',
-        port: 25060,
-        database: 'lol',
-        user: global.env.DO_USER || process.env.DO_USER,
-        password: global.env.DO_PASSWORD || process.env.DO_PASSWORD,
-        connectionLimit: 4,
-        sslmode: 'REQUIRED'    
-    })
+const pool = mysql.createPool({
+	host: process.env.DB_HOST || 'localhost',
+	port: parseInt(process.env.DB_PORT) || 3306,
+	database: 'lol',
+	user: global.env.DB_USER || process.env.DB_USER,
+	password: global.env.DB_PASSWORD || process.env.DB_PASSWORD,
+	connectionLimit: 4
+})
 
 const startApp = async (app, pool) => {
 	const conn = await pool.getConnection()
@@ -148,23 +114,12 @@ const startApp = async (app, pool) => {
 	}
 }
 
-// Web socket
-const expressWS = require('express-ws')
-const ROOM = {}
-const appWS = expressWS(app)
-
-// Imports the Google Cloud client libraries
-const vision = require('@google-cloud/vision');
-
 // start the app
 startApp(app, pool)
 
-app.use(express.static(`${__dirname}/dist/lol/browser`));
-
 app.post('/login', 
 // passport.authenticate('local', {session: false}),
-    async (req, resp, next)=>{
-
+    (req, resp, next)=>{
         const func = passport.authenticate('local',
             (err, user, info)=>{
                 if (null != err || !user) {
@@ -346,21 +301,35 @@ app.post('/saveWine', multipart.single('image-file'),
             }
             // post to SQL
             await conn.query(
-                SQL_SAVE_WINE, [wineID, wineName, wineName, userName, digitalOceanKey],
+                SQL_SAVE_WINE, [wineID, wineName, country, userName, digitalOceanKey],
             )
-          
-            await conn.commit()    
+
+                
+            await conn.commit()
+    
             resp.status(200)
             resp.json()
     
         } catch(e) {
-            
-            const params2 = {
-                Bucket: 'lol-bucket',   
-                Key: req.file.filename               
-              };
 
-            s3delete(params2)
+
+            // delete image from digital ocean
+            console.info('file', req.file)
+            if (req.file != null){
+                console.info('deleting from ocean')
+                var params = {
+                    Bucket: 'lol-bucket',
+                    Key: req.file?.filename
+                };
+                s3.deleteObject(params, function (err, data) {
+                    if (!err) {
+                        console.log('deleted ', data); // sucessful response
+                    } else {
+                        console.log(err); // an error ocurred
+                    }
+                });
+    
+            }
 
             conn.rollback()
             resp.status(500).send(e)
@@ -447,14 +416,14 @@ app.post('/uploadPictureRecognition', multipart.single('image-file'),
     }    
 );
 
-app.get('/IbmPictureRecognition/:digitalOceanKey', async (req, resp) => {
+app.get('/pictureRecognition/:digitalOceanKey', async (req, resp) => {
 
     const digitalOceanKey = req.params['digitalOceanKey']
     // IBM watson pic recognition
     const classifyParams = {
         url: 'https://picturerecognition.ams3.digitaloceanspaces.com/'+digitalOceanKey,
         owners: ['me'],
-        threshold: 0.7,
+        threshold: 0.6,
         classifierIds: ['food'],
     };
     
@@ -469,186 +438,8 @@ app.get('/IbmPictureRecognition/:digitalOceanKey', async (req, resp) => {
     });   
 })
 
-app.get('/googlePictureRecognition/:digitalOceanKey', async (req, resp) => {
+app.use(
+    express.static(__dirname + '/static')
+)
 
-    const digitalOceanKey = req.params['digitalOceanKey']
-    // Google Vision pic recognition
-
-    const client = new vision.ImageAnnotatorClient();
-    const [result] = await client.textDetection('https://picturerecognition.ams3.digitaloceanspaces.com/'+digitalOceanKey);
-    const detections = result.textAnnotations;
-    // console.log('Text:');
-    // detections.forEach(text => console.log(text));
-    
-    resp.json(detections[0])
-})
-
-app.post('/deleteSavedWine',
-    async (req, resp) => {
-        
-        const ID = req.body.ID
-        
-        const conn = await pool.getConnection()
-        try {
-            await conn.beginTransaction() // to prevent only one DB from being updated
-            const [ result, _ ] = await conn.query(SQL_SELECT_ALL_FROM_FAVOURITES_WHERE_ID, [ID])
-
-
-            // delete image from digital ocean
-            const params2 = {
-                Bucket: 'lol-bucket',   
-                Key: result[0].digitalOceanKey               
-              };
-
-            s3delete(params2)
-    
-            // delete from SQL
-            await conn.query(
-                SQL_DELETE_FAVOURITE_WINE, [ID],
-            )
-                
-            await conn.commit()
-    
-            resp.status(200)
-            resp.json()
-        }
-    
-    
-        catch(e) {
-            conn.rollback()
-            resp.status(500).send(e)
-            resp.end()
-
-        } finally {
-            conn.release()
-        }
-
-    }    
-);
-
-
-//create a bot
-// const bot = new Telegraf(global.env.TELEGRAM_TOKEN)
-// const photoURL = ""
-// const apikey = global.env.NEWS_API_KEY
-
-// // when a user starts a session with the bot
-// bot.start(ctx => {
-//     ctx.reply('Welcome to Wine Bot. Type /wine <wine name> to begin')
-// })
-
-// bot.hears('hi', ctx => ctx.reply ('Hi there! Type /wine <wine name> to begin'))
-
-// bot.command('wine', async ctx => {
-    
-//     const wine = ctx.message.text.substring(6)
-
-//     // display the menu if no wineName is specified with the command
-//     if (wine.length>=0){
-//         fetchWine(wine, ctx)
-//     }
-// })
-
-// const fetchWine = async (wine, ctx) => {
-
-//     ctx.reply(`Retrieving top 3 search results for "${wine}"`)
-
-//     const result = await fetch(`https://quiniwine.com/api/pub/wineKeywordSearch/${wine}/0/3`, {
-//         headers: {
-//             'Authorization': 'Bearer ' + global.env.QUINI_API_KEY
-//         }
-//     }) 
-
-//     const quiniapiresult =  await result.json() 
-
-//     // the below works to move certain elements from an array to a new array
-//     const results = quiniapiresult.items.map(              //length of new array will be the same
-//                 (d)=> {
-//                     return {wineID: d.id, name: d.Name, country: d.Country, varietal: d.Varietal, vintage: d.vintage, type: d.Type}          
-//                 }
-//     )
-
-//     var wineDetailsArray = []
-//     for(var i=0; i < results.length; i++) {
-
-//         const result = await fetch(`https://quiniwine.com/api/pub/wineSummary.json?wine_id=${results[i].wineID}`, {
-//             headers: {
-//                 'Accept': 'application/json',
-//                 'Authorization': 'Bearer ' + global.env.QUINI_API_KEY
-//             }
-//         }) 
-//         const wineDetailsResult = await result.json()
-//         wineDetailsArray.push(wineDetailsResult)
-//     }
-
-//     console.info(wineDetailsArray[0])
-
-
-//     for(var i=0; i < results.length; i++) {
-//         ctx.reply(
-//             results[i].name +" "+ results[i].varietal+ '\n\n' 
-//             + "Country: " + results[i].country + '\n' 
-//             + "Year: " + results[i].vintage + '\n' 
-//             + "Type: " + results[i].type + '\n' 
-//             + "Score: " + wineDetailsArray[i].aggregate?.scoreAvg[0] + '\n'
-//             + "Description: " + wineDetailsArray[i].agg_summary?.textReviews.mouth
-//         )
-//     }
-// }
-
-// bot.use((ctx, next) => {
-//     if (ctx.callbackQuery != null) {
-//         const wine = ctx.callbackQuery.data.substring(1)
-//         return fetchWine(wine, ctx)
-//     }
-//     next()
-// })
-
-// // start the bot
-// bot.launch()
-
-
-// websocket
-app.ws('/chat', (ws, req) => {
-    const name = req.query.name
-    console.info(`New webscoket connection: ${name}`)
-    // add the web socket connection to the room
-    ws.particpantName = name
-    ROOM[name] = ws
-
-    const chat = JSON.stringify({
-        from: name,
-        message: 'is in the houzzz!',
-        timeStamp: (new Date()).toString()
-    })
-    
-    for (let p in ROOM) {
-        ROOM[p].send(chat)
-    }
-
-
-    // construct the received message and broadcast back out
-    ws.on('message', (payload) => {
-
-        const chat = JSON.stringify({
-            from: name,
-            message: payload,
-            timeStamp: (new Date()).toString()
-        })
-
-        // loop through all active websocket subscriptions and push them the message
-        for (let p in ROOM) {
-            ROOM[p].send(chat)
-        }
-    })
-
-    ws.on('close', ()=>{
-        console.info(`Closing connection for ${name}`)
-
-        ROOM[name].close()
-        // remove name from the room
-        delete ROOM[name]
-    })
-
-})
-
+app.use(express.static ( __dirname + '/browser'))
