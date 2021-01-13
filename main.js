@@ -33,7 +33,7 @@ const jwt = require('jsonwebtoken')
 const app = express();
 
 const SQL_COUNT_DISTINCT_COUNTRIES = 'SELECT wineName, count(*) FROM favouritewines WHERE username = ? GROUP BY wineName order by count(*) desc;'
-const SQL_SAVE_WINE = 'insert into favouritewines (wineID, wineName, wineName, userName, digitalOceanKey ) values (?,?,?,?, ?);'
+const SQL_SAVE_WINE = 'insert into favouritewines (wineID, wineName, country, userName, digitalOceanKey ) values (?,?,?,?, ?);'
 const SQL_SELECT_ALL_FROM_FAVOURITES_WHERE_USERNAME = 'select * from favouritewines where userName = ?;'
 const SQL_SELECT_ALL_FROM_FAVOURITES_WHERE_ID = 'select * from favouritewines where ID = ?;'
 const SQL_DELETE_FAVOURITE_WINE = 'delete from favouritewines where ID = ?;'
@@ -207,7 +207,6 @@ app.get('/protected/secret',
     (req, resp, next) => {
         // check if the request has 'authorization' header
         const auth = req.get('Authorization')
-        console.info('QQQQ', auth)
         if (null == auth){
             resp.status(403)
             resp.json({message: 'Missing authorization access'})
