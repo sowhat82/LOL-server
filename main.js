@@ -206,6 +206,7 @@ app.get('/protected/secret',
         // check if the request has 'authorization' header
         const auth = req.get('Authorization')
         if (null == auth){
+            console.info('Missing authorization access')
             resp.status(403)
             resp.json({message: 'Missing authorization access'})
             return
@@ -214,6 +215,7 @@ app.get('/protected/secret',
         // check for bearer type auth
         const terms = auth.split(' ')
         if (terms.length != 2 || terms[0] != 'Bearer'){
+            console.info('Incorrect authorization access')
             resp.status(403)
             resp.json({message: 'Incorrect authorization access'})
             return
@@ -228,6 +230,7 @@ app.get('/protected/secret',
             next()
         } 
         catch(e){
+            console.info('Incorrect token')
             resp.status(403)
             resp.json({message: 'Incorrect token', error: e})
            return
@@ -235,6 +238,7 @@ app.get('/protected/secret',
     },
 
     (req, resp) => {
+        console.info('Token valid')
         resp.status(200)
         resp.json({message: 'Token valid', status: 200})
     }
