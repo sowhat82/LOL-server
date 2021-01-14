@@ -242,7 +242,6 @@ app.get('/protected/secret',
 
 app.get('/searchResults/', async (req, resp) => {
 
-
     const searchText = req.query['wineName']
     const skip = req.query['offset']
     const limit = req.query['limit']
@@ -254,11 +253,64 @@ app.get('/searchResults/', async (req, resp) => {
         }
         ) 
 
-        const quiniapiresult =  await result.json() 
-    
-        resp.status(200)
-        resp.type('application/json')
-        resp.json(quiniapiresult)
+        console.info('Quini status ', result.status)
+        if (result.status == 200){
+            const quiniapiresult =  await result.json() 
+            resp.status(200)
+            resp.type('application/json')
+            resp.json(quiniapiresult)    
+        } 
+        // if API server is down, return hardcoded info
+        else{
+            resp.status(200)
+            resp.type('application/json')
+            resp.json(
+                    {
+                        "nextskip": 10,
+                        "category": "ROSES",
+                        "items": [
+                            {
+                                "_id": "54566e1d65ade0020000001f",
+                                "id": "54566e1d65ade0020000001f",
+                                "Name": "Yellow Tail",
+                                "Winery": "Bollinger",
+                                "Area": "Champagne",
+                                "Province": "",
+                                "Country": "France",
+                                "Varietal": "Pinot Noir, Chardonnay",
+                                "vintage": "2000",
+                                "Style": "",
+                                "Type": "Rose"
+                            },
+                            {
+                                "_id": "54566e1d65ade0020000001f",
+                                "id": "54566e1d65ade0020000001f",
+                                "Name": "Frontera",
+                                "Winery": "Bollinger",
+                                "Area": "Champagne",
+                                "Province": "",
+                                "Country": "France",
+                                "Varietal": "Cabernet Sauvignon",
+                                "vintage": "2014",
+                                "Style": "",
+                                "Type": "Rose"
+                            },
+                            {
+                                "_id": "54566e1d65ade0020000001f",
+                                "id": "54566e1d65ade0020000001f",
+                                "Name": "Frontera",
+                                "Winery": "Bollinger",
+                                "Area": "Champagne",
+                                "Province": "",
+                                "Country": "France",
+                                "Varietal": "Special",
+                                "vintage": "2013",
+                                "Style": "",
+                                "Type": "Rose"
+                            }
+                ]}    
+            )
+        }
 
     }
     catch(e){
@@ -277,12 +329,52 @@ app.get('/getWineDetails/:wineID', async (req, resp) => {
                 'Authorization': 'Bearer ' + global.env.QUINI_API_KEY
             }
         }
-        ) 
-        const wineDetailsResult = await result.json()
-    
-        resp.status(200)
-        resp.type('application/json')
-        resp.json(wineDetailsResult)
+        )
+
+        if(result.status == 200){
+            const wineDetailsResult = await result.json()
+            resp.status(200)
+            resp.type('application/json')
+            resp.json(wineDetailsResult)    
+        }
+        // return hardcoded info if server is down
+        else{
+            resp.status(200)
+            resp.type('application/json')
+            resp.json(  {
+                "aggregate": {
+                  "scoreAvg": [
+                    100,//Eye score
+                    88.33333333333333,//Nose score
+                    93.33333333333333,//Mouth score
+                    93.66666666666667,//Finish score
+                    91//Overall score
+                  ],
+                "wine": {
+                  "id": "53ab5f2adab5f0020000001f",
+                  "Name": "Prima Perla Prosecco NV",
+                  "Winery": "Prima Perla",
+                  "vintage": "nv",
+                  "Country": "Italy ",
+                  "Area": "Veneto ",
+                  "Style": "",
+                  "Varietal": "Glera ",
+                  "Type": "White"
+                },
+                  "count": 3//Total review number of this wine
+                },
+                "agg_summary": {
+                  "textReviews": {
+                    "eye": "Clear rim, Clear depth",
+                    "nose": "Citrus, Fruity, Floral aromas",
+                    "mouth": "Melon, Grapefruit, Citrus, Fruity, Orange Blossom, Floral flavours, Fresh sweetness, Fresh acidity, Rich tannins, Mild alcohol",
+                    "finish": "Medium duration, Good quality, Early peaktime",
+                    "overall": "Simple complexity, Pleasant interest, Expected typicity, Harmonious balance"
+                  }
+                }
+              }
+            )
+        }
 
     }
     catch(e){
@@ -338,7 +430,6 @@ app.post('/saveWine', multipart.single('image-file'),
                 SQL_SAVE_WINE, [wineID, wineName, country, userName, digitalOceanKey],
             )
 
-                
             await conn.commit()
     
             resp.status(200)
@@ -449,39 +540,51 @@ app.post('/uploadPictureRecognition', multipart.single('image-file'),
             // post to digital ocean
             if (req.file != null){
 
-                console.info(req.file.path)
                 await fs.readFile(req.file.path, async (err, imgFile) => {      
-                    const params = {
-                        Bucket: 'picturerecognition',
-                        Key: req.file.filename,
-                        Body: imgFile,
-                        ACL: 'public-read',
-                        ContentType: req.file.mimetype,
-                        ContentLength: req.file.size,
-                        Metadata: {
-                            originalName: req.file.originalname,
-                            author: 'alvin',
-                            update: 'image',
-                        }
-                    }
+                    // const params = {
+                    //     Bucket: 'picturerecognition',
+                    //     Key: req.file.filename,
+                    //     Body: imgFile,
+                    //     ACL: 'public-read',
+                    //     ContentType: req.file.mimetype,
+                    //     ContentLength: req.file.size,
+                    //     Metadata: {
+                    //         originalName: req.file.originalname,
+                    //         author: 'alvin',
+                    //         update: 'image',
+                    //     }
+                    // }
                     // post to digital ocean continued
-                    await s3.putObject(params, (error, result) => {
-                        // return resp.status(200)
-                        // .type('application/json')    
-                        // .json({ 'key': req.file.filename });
-                    })
+                    // await s3.putObject(params, (error, result) => {
+                    //     // return resp.status(200)
+                    //     // .type('application/json')    
+                    //     // .json({ 'key': req.file.filename });
+                    // })
 
-                    var result = 0
-                    do{
-                        result = await fetch('https://picturerecognition.ams3.digitaloceanspaces.com/'+req.file.filename, {
-                            headers: {
-                                'Accept': 'application/json'
-                            }
-                        })    
-                    } while(result.status != 200)
+                    // // loop to ensure that the file is fully uploaded to S3
+                    // var result = 0
+                    // do{
+                    //     result = await fetch('https://picturerecognition.ams3.digitaloceanspaces.com/'+req.file.filename, {
+                    //         headers: {
+                    //             'Accept': 'application/json'
+                    //         }
+                    //     })    
+                    // } while(result.status != 200)
                     
+                    // Google Vision pic recognition
+                    const client = new vision.ImageAnnotatorClient();
+
+                    const [result3] = await client.textDetection(imgFile);
+
+                    console.info('dudududududud', [result3])
+                    const detections = result3.textAnnotations;
                     resp.status(200)
-                    resp.json(req.file.filename)
+                    resp.json(detections[0])
+
+                    
+
+                    // resp.status(200)
+                    // resp.json(req.file.filename)
                 })
             }
         } 
