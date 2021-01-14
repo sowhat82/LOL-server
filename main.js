@@ -534,6 +534,7 @@ app.post('/deleteSavedWine',
     }    
 );
 
+// google image recognition
 app.post('/uploadPictureRecognition', multipart.single('image-file'),
     async (req, resp) => {
         try {
@@ -541,50 +542,38 @@ app.post('/uploadPictureRecognition', multipart.single('image-file'),
             if (req.file != null){
 
                 await fs.readFile(req.file.path, async (err, imgFile) => {      
-                    // const params = {
-                    //     Bucket: 'picturerecognition',
-                    //     Key: req.file.filename,
-                    //     Body: imgFile,
-                    //     ACL: 'public-read',
-                    //     ContentType: req.file.mimetype,
-                    //     ContentLength: req.file.size,
-                    //     Metadata: {
-                    //         originalName: req.file.originalname,
-                    //         author: 'alvin',
-                    //         update: 'image',
-                    //     }
-                    // }
-                    // post to digital ocean continued
-                    // await s3.putObject(params, (error, result) => {
-                    //     // return resp.status(200)
-                    //     // .type('application/json')    
-                    //     // .json({ 'key': req.file.filename });
-                    // })
-
-                    // // loop to ensure that the file is fully uploaded to S3
-                    // var result = 0
-                    // do{
-                    //     result = await fetch('https://picturerecognition.ams3.digitaloceanspaces.com/'+req.file.filename, {
-                    //         headers: {
-                    //             'Accept': 'application/json'
-                    //         }
-                    //     })    
-                    // } while(result.status != 200)
                     
-                    // Google Vision pic recognition
+                    // Google Vision image recognition
                     const client = new vision.ImageAnnotatorClient();
-
                     const [result3] = await client.textDetection(imgFile);
+                    console.info('Google image result: ', [result3])
+                    console.info('Google image error status: ', [result3.error])
 
-                    console.info('dudududududud', [result3])
-                    const detections = result3.textAnnotations;
-                    resp.status(200)
-                    resp.json(detections[0])
-
-                    
-
-                    // resp.status(200)
-                    // resp.json(req.file.filename)
+                    if (result3.error == null){
+                        const detections = result3.textAnnotations;
+                        resp.status(200)
+                        resp.json({ type: 'google', response: detections[0]})    
+                    }
+                    // if google fails, run IBM image recognition
+                    else{
+                        const classifyParams = {
+                            // url: 'https://picturerecognition.ams3.digitaloceanspaces.com/'+digitalOceanKey,
+                            imagesFile: imgFile,
+                            owners: ['me'],
+                            threshold: 0.7,
+                            classifierIds: ['food'],
+                        };
+                        visualRecognition.classify(classifyParams)
+                        .then((response) => {
+                            const classifiedImages = response.result;
+                            console.log(JSON.stringify(classifiedImages, null, 2));
+                            resp.status(200)
+                            resp.json({type: 'ibm', response: response})
+                        })
+                        .catch(err => {
+                            console.log('error:', err);
+                        });   
+                    }
                 })
             }
         } 
@@ -595,49 +584,51 @@ app.post('/uploadPictureRecognition', multipart.single('image-file'),
     }    
 );
 
-app.get('/IbmPictureRecognition/:digitalOceanKey', async (req, resp) => {
+// ibm image recognition
+// app.get('/IbmPictureRecognition/:digitalOceanKey', async (req, resp) => {
 
-    const digitalOceanKey = req.params['digitalOceanKey']
-    // IBM watson pic recognition
-    const classifyParams = {
-        url: 'https://picturerecognition.ams3.digitaloceanspaces.com/'+digitalOceanKey,
-        owners: ['me'],
-        threshold: 0.7,
-        classifierIds: ['food'],
-    };
+//     const digitalOceanKey = req.params['digitalOceanKey']
+//     // IBM watson pic recognition
+//     const classifyParams = {
+//         url: 'https://picturerecognition.ams3.digitaloceanspaces.com/'+digitalOceanKey,
+//         owners: ['me'],
+//         threshold: 0.7,
+//         classifierIds: ['food'],
+//     };
     
-    visualRecognition.classify(classifyParams)
-    .then((response) => {
-        const classifiedImages = response.result;
-        console.log(JSON.stringify(classifiedImages, null, 2));
-        resp.json(response)
-    })
-    .catch(err => {
-        console.log('error:', err);
-    });   
-})
+//     visualRecognition.classify(classifyParams)
+//     .then((response) => {
+//         const classifiedImages = response.result;
+//         console.log(JSON.stringify(classifiedImages, null, 2));
+//         resp.json(response)
+//     })
+//     .catch(err => {
+//         console.log('error:', err);
+//     });   
+// })
 
-app.get('/googlePictureRecognition/:digitalOceanKey', async (req, resp) => {
+// app.get('/googlePictureRecognition/:digitalOceanKey', async (req, resp) => {
 
+//     const digitalOceanKey = req.params['digitalOceanKey']
 
-    const digitalOceanKey = req.params['digitalOceanKey']
+//     // Google Vision pic recognition
 
-    // Google Vision pic recognition
+//     const client = new vision.ImageAnnotatorClient();
 
-    const client = new vision.ImageAnnotatorClient();
+//     const [result] = await client.textDetection('https://picturerecognition.ams3.digitaloceanspaces.com/'+digitalOceanKey);
 
-    const [result] = await client.textDetection('https://picturerecognition.ams3.digitaloceanspaces.com/'+digitalOceanKey);
+//     console.info([result])
+//     const detections = result.textAnnotations;
+//     // console.log('Text:');
+//     // detections.forEach(text => console.log(text));
 
-    console.info([result])
-    const detections = result.textAnnotations;
-    // console.log('Text:');
-    // detections.forEach(text => console.log(text));
-
-    resp.json(detections[0])
-})
+//     resp.json(detections[0])
+// })
 
 
 //create a bot
+
+
 const bot = new Telegraf(global.env.TELEGRAM_TOKEN)
 
 // when a user starts a session with the bot
