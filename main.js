@@ -546,7 +546,6 @@ app.post('/uploadPictureRecognition', multipart.single('image-file'),
                     // Google Vision image recognition
                     const client = new vision.ImageAnnotatorClient();
                     const [result3] = await client.textDetection(imgFile);
-                    console.info('Google image result: ', [result3])
                     console.info('Google image error status: ', [result3.error])
 
                     if (result3.error == null){
