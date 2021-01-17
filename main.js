@@ -6,6 +6,7 @@ const passport = require('passport');
 //passport strategy
 const LocalStrategy = require('passport-local').Strategy;
 const fetch = require('node-fetch')
+const cors = require('cors')
 
 const AWS = require('aws-sdk');
 const fs = require('fs')
@@ -31,6 +32,8 @@ const mysql = require('mysql2/promise')
 const PORT = parseInt(process.argv[2]) || parseInt(process.env.PORT) || 3000
 const jwt = require('jsonwebtoken')
 const app = express();
+
+app.use(cors())
 
 const SQL_COUNT_DISTINCT_COUNTRIES = 'SELECT country, count(*) FROM favouritewines WHERE username = ? GROUP BY country order by count(*) desc;'
 const SQL_SAVE_WINE = 'insert into favouritewines (wineID, wineName, country, userName, digitalOceanKey ) values (?,?,?,?, ?);'
