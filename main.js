@@ -7,6 +7,7 @@ const passport = require('passport');
 const LocalStrategy = require('passport-local').Strategy;
 const fetch = require('node-fetch')
 const cors = require('cors')
+cors({credentials: true, origin: true})
 
 const AWS = require('aws-sdk');
 const fs = require('fs')
