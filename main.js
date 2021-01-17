@@ -136,15 +136,6 @@ const expressWS = require('express-ws')
 const ROOM = {}
 const appWS = expressWS(app)
 
-app.ws('/chat', function (ws, req)
-{
-    ws.send("Working!");
-
-    ws.on('message', function(msg) {
-        ws.send(msg);
-    });
-});
-
 // Imports the Google Cloud client libraries
 const vision = require('@google-cloud/vision');
 
