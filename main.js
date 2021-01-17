@@ -37,6 +37,7 @@ const SQL_SAVE_WINE = 'insert into favouritewines (wineID, wineName, country, us
 const SQL_SELECT_ALL_FROM_FAVOURITES_WHERE_USERNAME = 'select * from favouritewines where userName = ?;'
 const SQL_SELECT_ALL_FROM_FAVOURITES_WHERE_ID = 'select * from favouritewines where ID = ?;'
 const SQL_DELETE_FAVOURITE_WINE = 'delete from favouritewines where ID = ?;'
+const SQL_ADD_TO_USERS = 'insert into users (userName, password) values (?, sha(?));'
 
 const s3delete = function (params) {
     return new Promise((resolve, reject) => {
@@ -535,6 +536,34 @@ app.post('/deleteSavedWine',
             conn.release()
         }
 
+    }    
+);
+
+app.post('/createAccount',
+    async (req, resp) => {
+
+        const newUsername = req.body.username
+        const newPassword = req.body.password
+
+        console.info('password: ', newPassword)
+        const conn = await pool.getConnection()
+        try {
+            await conn.beginTransaction() // to prevent only one DB from being updated
+            const [ result, _ ] = await conn.query(SQL_ADD_TO_USERS, [newUsername, newPassword])
+
+            await conn.commit()
+
+            resp.status(200)
+            resp.json()
+        }
+        catch(e) {
+            conn.rollback()
+            resp.status(500).send(e)
+            resp.end()
+
+        } finally {
+            conn.release()
+        }
     }    
 );
 
