@@ -669,6 +669,8 @@ bot.start(ctx => {
 })
 
 bot.hears('hi', ctx => ctx.reply ('Hi there! Type /wine <wine name> to begin'))
+bot.on('text', ctx => ctx.reply("I'm sorry. I don't understand. Type '/wine <wine name>' to search for wine information"));
+
 
 bot.command('wine', async ctx => {
 
