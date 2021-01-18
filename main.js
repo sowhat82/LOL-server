@@ -34,7 +34,7 @@ const PORT = parseInt(process.argv[2]) || parseInt(process.env.PORT) || 3000
 const jwt = require('jsonwebtoken')
 const app = express();
 
-// app.use(cors())
+app.use(cors())
 
 const SQL_COUNT_DISTINCT_COUNTRIES = 'SELECT country, count(*) FROM favouritewines WHERE username = ? GROUP BY country order by count(*) desc;'
 const SQL_SAVE_WINE = 'insert into favouritewines (wineID, wineName, country, userName, digitalOceanKey ) values (?,?,?,?, ?);'
@@ -161,6 +161,14 @@ const startApp = async (app, pool) => {
 
 // start the app
 startApp(app, pool)
+
+app.options('/login', function(req, res, next){
+    res.header('Access-Control-Allow-Origin', "*");
+    res.header('Access-Control-Allow-Methods', 'POST');
+    res.header("Access-Control-Allow-Headers", "accept, content-type");
+    res.header("Access-Control-Max-Age", "1728000");
+    return res.sendStatus(200);
+ });
 
 app.post('/login', 
 // passport.authenticate('local', {session: false}),
