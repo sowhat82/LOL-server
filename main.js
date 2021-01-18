@@ -34,7 +34,7 @@ const PORT = parseInt(process.argv[2]) || parseInt(process.env.PORT) || 3000
 const jwt = require('jsonwebtoken')
 const app = express();
 
-app.use(cors())
+// app.use(cors())
 
 const SQL_COUNT_DISTINCT_COUNTRIES = 'SELECT country, count(*) FROM favouritewines WHERE username = ? GROUP BY country order by count(*) desc;'
 const SQL_SAVE_WINE = 'insert into favouritewines (wineID, wineName, country, userName, digitalOceanKey ) values (?,?,?,?, ?);'
@@ -614,7 +614,6 @@ app.post('/createAccount',
         const newUsername = req.body.username
         const newPassword = req.body.password
 
-        console.info('password: ', newPassword)
         const conn = await pool.getConnection()
         try {
             await conn.beginTransaction() // to prevent only one DB from being updated
@@ -626,8 +625,10 @@ app.post('/createAccount',
             resp.json()
         }
         catch(e) {
+            
             conn.rollback()
-            resp.status(500).send(e)
+            resp.status(500)
+            resp.send(e)
             resp.end()
 
         } finally {
