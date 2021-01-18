@@ -40,7 +40,10 @@ const SQL_COUNT_DISTINCT_COUNTRIES = 'SELECT country, count(*) FROM favouritewin
 const SQL_SAVE_WINE = 'insert into favouritewines (wineID, wineName, country, userName, digitalOceanKey ) values (?,?,?,?, ?);'
 const SQL_SELECT_ALL_FROM_FAVOURITES_WHERE_USERNAME = 'select * from favouritewines where userName = ?;'
 const SQL_SELECT_ALL_FROM_FAVOURITES_WHERE_ID = 'select * from favouritewines where ID = ?;'
+const SQL_SELECT_ALL_FROM_FAVOURITES = 'select * from favouritewines;'
+const SQL_SELECT_ALL_FROM_USERS = 'select * from users;'
 const SQL_DELETE_FAVOURITE_WINE = 'delete from favouritewines where ID = ?;'
+const SQL_DELETE_USER = 'delete from users where userName = ?;'
 const SQL_ADD_TO_USERS = 'insert into users (userName, password) values (?, sha(?));'
 
 const s3delete = function (params) {
@@ -483,6 +486,38 @@ app.get('/favourites/:userName', async (req, resp) => {
 	}
 })
 
+app.get('/favourites', async (req, resp) => {
+
+	const conn = await pool.getConnection()
+	try {
+		const [ result, _ ] = await conn.query(SQL_SELECT_ALL_FROM_FAVOURITES)
+		resp.status(200)
+		resp.type('application/json').send(result)
+	} catch(e) {
+		console.error('ERROR: ', e)
+		resp.status(500)
+		resp.end()
+	} finally {
+		conn.release()
+	}
+})
+
+app.get('/users', async (req, resp) => {
+
+	const conn = await pool.getConnection()
+	try {
+		const [ result, _ ] = await conn.query(SQL_SELECT_ALL_FROM_USERS)
+		resp.status(200)
+		resp.type('application/json').send(result)
+	} catch(e) {
+		console.error('ERROR: ', e)
+		resp.status(500)
+		resp.end()
+	} finally {
+		conn.release()
+	}
+})
+
 app.get('/countryCount/:userName', async (req, resp) => {
 
 	const userName = req.params.userName
@@ -540,6 +575,36 @@ app.post('/deleteSavedWine',
             conn.release()
         }
 
+    }    
+);
+
+app.post('/deleteUser',
+    async (req, resp) => {
+
+        const userName = req.body.userName
+
+        const conn = await pool.getConnection()
+        try {
+            await conn.beginTransaction() // to prevent only one DB from being updated
+
+            // delete from SQL
+            await conn.query(
+                SQL_DELETE_USER, [userName],
+            )
+
+            await conn.commit()
+
+            resp.status(200)
+            resp.json()
+        }
+        catch(e) {
+            conn.rollback()
+            resp.status(500).send(e)
+            resp.end()
+
+        } finally {
+            conn.release()
+        }
     }    
 );
 
@@ -759,7 +824,6 @@ app.ws('/chat', (ws, req) => {
     for (let p in ROOM) {
         ROOM[p].send(chat)
     }
-
 
     // construct the received message and broadcast back out
     ws.on('message', (payload) => {
