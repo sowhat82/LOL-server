@@ -673,8 +673,6 @@ bot.start(ctx => {
 })
 
 bot.hears('hi', ctx => ctx.reply ('Hi there! Type /wine <wine name> to begin'))
-bot.on('text', ctx => ctx.reply("I'm sorry. I don't understand. Type '/wine <wine name>' to search for wine information"));
-
 
 bot.command('wine', async ctx => {
 
@@ -738,6 +736,8 @@ bot.use((ctx, next) => {
     next()
 })
 
+bot.on('text', ctx => ctx.reply("I'm sorry. I don't understand. Type '/wine <wine name>' to search for wine information"));
+
 // start the bot
 bot.launch()
 
@@ -785,7 +785,6 @@ app.ws('/chat', (ws, req) => {
     })
 
 })
-
 
 app.use(
     express.static(__dirname + '/static')
