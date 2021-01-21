@@ -365,6 +365,29 @@ app.get('/searchResults/', async (req, resp) => {
 
 })
 
+app.get('/wineByCategory', async (req, resp) => {
+
+    const categoryCode = req.query['categoryCode']
+    try{
+        const result = await fetch(`https://quiniwine.com/api/pub/wineCategory/${categoryCode}/0/10`, {
+            headers: {
+                'Authorization': 'Bearer ' + global.env.QUINI_API_KEY
+            }
+        }
+        ) 
+
+            const quiniapiresult =  await result.json() 
+            resp.status(200)
+            resp.type('application/json')
+            resp.json(quiniapiresult)    
+
+    }
+    catch(e){
+        console.info(e)
+    }
+
+})
+
 app.get('/getWineDetails/:wineID', async (req, resp) => {
 
     const wineID = req.params['wineID']
