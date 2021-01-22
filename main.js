@@ -73,6 +73,8 @@ const visualRecognition = new VisualRecognitionV3({
     url: 'https://api.kr-seo.visual-recognition.watson.cloud.ibm.com/instances/e0cb1977-6d5e-4ad9-87a1-d977c63477e6',
   });
 
+const imageSearch = require('image-search-google');
+
 app.use(morgan('combined'))
 app.use (express.json())
 app.use(express.urlencoded({extended:true}))
@@ -365,6 +367,32 @@ app.get('/searchResults/', async (req, resp) => {
 
 })
 
+const client = new imageSearch(global.env.CSE_ID, global.env.GOOGLE_API_KEY);
+const options = {page:1, type: 'photo'};
+
+app.get('/imageSearch', async (req, resp) => {
+
+    const wineName = req.query['wineName']
+
+    client.search(wineName, options)
+    .then(images => {
+        /*
+        [{
+            'url': item.link,
+            'thumbnail':item.image.thumbnailLink,
+            'snippet':item.title,
+            'context': item.image.contextLink
+        }]
+         */
+        // console.info('image result is: ', images)
+        resp.status(200)
+        resp.type('application/json')
+        resp.json(images)    
+    })
+    .catch(error => console.log(error));
+
+})
+
 app.get('/wineByCategory', async (req, resp) => {
 
     const categoryCode = req.query['categoryCode']
@@ -609,7 +637,9 @@ app.post('/deleteSavedWine',
                 Key: result[0].digitalOceanKey               
               };
 
-            s3delete(params2)
+            if (params2.Key != null){
+                s3delete(params2)
+            }
 
             // delete from SQL
             await conn.query(
