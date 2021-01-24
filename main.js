@@ -731,8 +731,8 @@ app.post('/uploadPictureRecognition', multipart.single('image-file'),
             // post to digital ocean
             if (req.file != null){
 
-                await fs.readFile(req.file.path, async (err, imgFile) => {      
-                    
+                await fs.readFile(req.file.path, async (err, imgFile) => {                       
+
                     // Google Vision image recognition
                     const client = new vision.ImageAnnotatorClient();
                     const [result3] = await client.textDetection(imgFile);
