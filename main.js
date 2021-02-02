@@ -145,20 +145,27 @@ const appWS = expressWS(app)
 const vision = require('@google-cloud/vision');
 
 const startApp = async (app, pool) => {
-	const conn = await pool.getConnection()
-	try {
-		console.info('Pinging database...')
-		await conn.ping()
 
-        app.listen(PORT, () => {
-            console.info(`Application started on port ${PORT} at ${new Date()}`)        
-        })
+    // start the server without connecting to the SQL database
+    app.listen(PORT, () => {
+        console.info(`Application started on port ${PORT} at ${new Date()}`)        
+    })
 
-    } catch(e) {
-		console.error('Cannot ping database', e)
-	} finally {
-		conn.release()
-	}
+    // connect to database and start the server
+    // const conn = await pool.getConnection()
+	// try {
+	// 	console.info('Pinging database...')
+	// 	await conn.ping()
+
+    //     app.listen(PORT, () => {
+    //         console.info(`Application started on port ${PORT} at ${new Date()}`)        
+    //     })
+
+    // } catch(e) {
+	// 	console.error('Cannot ping database', e)
+	// } finally {
+	// 	conn.release()
+	// }
 }
 
 // start the app
